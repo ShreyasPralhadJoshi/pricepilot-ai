@@ -12,10 +12,15 @@ db.sqlite3
 /staticfiles/
 
 # Trained ML artifacts (regenerate with: python manage.py train_models)
-/models/*.joblib
+/models/*
+!models/.gitkeep
+!models/demand_regressor.joblib
+!models/conversion_classifier.joblib
 
 # Generated dataset (regenerate with: python manage.py generate_data)
 /data/*.csv
+!data/.gitkeep
+!data/seed.sqlite3
 
 # IDE / OS
 .vscode/

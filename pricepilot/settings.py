@@ -3,18 +3,31 @@ Django settings for PricePilot AI.
 
 A dynamic pricing engine for e-commerce platforms.
 """
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+
 # SECURITY WARNING: keep the secret key used in production secret!
-# For real deployments, load this from an environment variable.
-SECRET_KEY = "django-insecure-change-me-in-production-pricepilot-ai-demo-key"
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-change-me-in-production-pricepilot-ai-demo-key",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get(
+    "DJANGO_DEBUG",
+    "false" if IS_VERCEL else "true",
+).lower() == "true"
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+
+if IS_VERCEL and os.environ.get("VERCEL_URL"):
+    CSRF_TRUSTED_ORIGINS = [f"https://{os.environ['VERCEL_URL']}"]
+else:
+    CSRF_TRUSTED_ORIGINS = []
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -58,10 +71,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "pricepilot.wsgi.application"
 
+# Vercel's filesystem is read-only except /tmp; bootstrap copies the seed DB there.
+DB_PATH = Path("/tmp/db.sqlite3") if IS_VERCEL else BASE_DIR / "db.sqlite3"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": DB_PATH,
     }
 }
 

@@ -1,0 +1,17 @@
+{
+  "builds": [
+    {
+      "src": "pricepilot/wsgi.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "pricepilot/wsgi.py"
+    }
+  ]
+}
