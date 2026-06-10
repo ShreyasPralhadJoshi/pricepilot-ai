@@ -7,9 +7,16 @@ import os
 import shutil
 from pathlib import Path
 
+SERVERLESS_ROOT = Path("/var/task")
+
+
+def is_serverless(base_dir: Path) -> bool:
+    """True on Vercel/Lambda where the app is deployed under /var/task."""
+    return SERVERLESS_ROOT.is_dir() and base_dir.resolve() == SERVERLESS_ROOT
+
 
 def ensure_vercel_database(base_dir: Path) -> None:
-    if not os.environ.get("VERCEL"):
+    if not is_serverless(base_dir):
         return
 
     tmp_db = Path("/tmp/db.sqlite3")

@@ -8,7 +8,10 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
+from pricepilot.bootstrap import ensure_vercel_database, is_serverless
+
+IS_VERCEL = is_serverless(BASE_DIR)
+ensure_vercel_database(BASE_DIR)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(
