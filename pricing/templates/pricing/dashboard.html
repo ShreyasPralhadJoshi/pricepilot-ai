@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PricePilot AI — Dynamic Pricing Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --navy: #1a2b4a; --accent: #2f6fed; --bg: #f4f6fb; --card: #ffffff;
+      --ink: #1f2733; --muted: #6b7787; --line: #e6eaf2; --good: #1f9d62;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--ink); }
+    header { background: var(--navy); color: #fff; padding: 20px 28px; }
+    header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+    header p { margin: 4px 0 0; color: #b9c4dc; font-size: 13px; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    .grid { display: grid; gap: 18px; grid-template-columns: repeat(2, 1fr); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+            padding: 18px 20px; }
+    .card h2 { margin: 0 0 14px; font-size: 14px; text-transform: uppercase;
+               letter-spacing: .6px; color: var(--muted); }
+    .sim { grid-column: 1 / -1; }
+    .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: end; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; color: var(--muted); }
+    select, input { padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+                    font-size: 14px; background: #fff; }
+    button { background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+             padding: 10px 18px; font-size: 14px; cursor: pointer; font-weight: 600; }
+    button:hover { background: #2459c9; }
+    .result { margin-top: 16px; display: none; gap: 14px; flex-wrap: wrap; }
+    .stat { background: var(--bg); border-radius: 10px; padding: 12px 16px; min-width: 130px; }
+    .stat .v { font-size: 22px; font-weight: 700; color: var(--navy); }
+    .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing:.4px; }
+    .price-big { color: var(--good) !important; }
+    canvas { max-height: 260px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PricePilot AI</h1>
+    <p>ML-driven dynamic pricing engine for e-commerce · Django + DRF + scikit-learn</p>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card sim">
+        <h2>Live Price Recommendation</h2>
+        <div class="row">
+          <div class="field">
+            <label>Product</label>
+            <select id="product">
+              {% for p in products %}
+              <option value="{{ p.id }}" data-base="{{ p.base_price }}">{{ p.sku }} — {{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Competitor price (₹)</label>
+            <input type="number" id="competitor" placeholder="auto" />
+          </div>
+          <div class="field">
+            <label>Strategy</label>
+            <select id="strategy">
+              <option value="maximize_revenue">Maximize revenue</option>
+              <option value="maximize_profit">Maximize profit</option>
+              <option value="balance_revenue_retention">Balance revenue & retention</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Holiday season</label>
+            <select id="holiday"><option value="false">No</option><option value="true">Yes</option></select>
+          </div>
+          <button onclick="recommend()">Get optimal price</button>
+        </div>
+        <div class="result" id="result"></div>
+        <canvas id="curveChart" style="margin-top:18px;"></canvas>
+      </div>
+
+      <div class="card"><h2>Profit Margins by Product</h2><canvas id="marginChart"></canvas></div>
+      <div class="card"><h2>Revenue Performance by Category</h2><canvas id="revenueChart"></canvas></div>
+      <div class="card"><h2>Inventory Levels</h2><canvas id="inventoryChart"></canvas></div>
+      <div class="card"><h2>Pricing Trends by Strategy</h2><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+
+  <script>
+    const ACCENT = "#2f6fed", NAVY = "#1a2b4a", GOOD = "#1f9d62";
+    let curveChart;
+
+    async function recommend() {
+      const sel = document.getElementById("product");
+      const body = {
+        product_id: parseInt(sel.value),
+        strategy: document.getElementById("strategy").value,
+        is_holiday_season: document.getElementById("holiday").value === "true",
+      };
+      const comp = document.getElementById("competitor").value;
+      if (comp) body.competitor_price = parseFloat(comp);
+
+      const r = await fetch("/api/recommend-price/", {
+        method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(data.error || "Error"); return; }
+      const q = data.recommendation;
+      const res = document.getElementById("result");
+      res.style.display = "flex";
+      res.innerHTML = `
+        <div class="stat"><div class="v price-big">₹${q.price}</div><div class="l">Recommended price</div></div>
+        <div class="stat"><div class="v">${q.expected_demand}</div><div class="l">Expected units</div></div>
+        <div class="stat"><div class="v">₹${Math.round(q.expected_revenue)}</div><div class="l">Expected revenue</div></div>
+        <div class="stat"><div class="v">₹${Math.round(q.expected_profit)}</div><div class="l">Expected profit</div></div>
+        <div class="stat"><div class="v">${(q.purchase_likelihood*100).toFixed(0)}%</div><div class="l">Purchase likelihood</div></div>`;
+      drawCurve(body);
+    }
+
+    async function drawCurve(body) {
+      const r = await fetch("/api/predict-demand/", {
+        method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (!r.ok) return;
+      const labels = data.curve.map(c => c.price);
+      const revenue = data.curve.map(c => c.expected_revenue);
+      const demand = data.curve.map(c => c.expected_demand);
+      if (curveChart) curveChart.destroy();
+      curveChart = new Chart(document.getElementById("curveChart"), {
+        type: "line",
+        data: { labels, datasets: [
+          { label: "Expected revenue (₹)", data: revenue, borderColor: ACCENT, yAxisID: "y", tension: .3 },
+          { label: "Expected demand (units)", data: demand, borderColor: GOOD, yAxisID: "y1", tension: .3 },
+        ]},
+        options: { responsive: true, interaction: {mode: "index", intersect: false},
+          scales: { y: {position:"left", title:{display:true,text:"Revenue"}},
+                    y1: {position:"right", grid:{drawOnChartArea:false}, title:{display:true,text:"Demand"}},
+                    x: {title:{display:true,text:"Price (₹)"}} } }
+      });
+    }
+
+    async function loadMetrics() {
+      const data = await (await fetch("/api/metrics/")).json();
+      new Chart(document.getElementById("marginChart"), {
+        type: "bar",
+        data: { labels: data.profit_margins.map(m=>m.sku),
+          datasets: [{ label:"Margin %", data: data.profit_margins.map(m=>m.margin_pct), backgroundColor: ACCENT }] },
+        options: { plugins:{legend:{display:false}} }
+      });
+      new Chart(document.getElementById("revenueChart"), {
+        type: "doughnut",
+        data: { labels: data.revenue_performance.map(d=>d.product__category),
+          datasets: [{ data: data.revenue_performance.map(d=>d.units),
+            backgroundColor: ["#2f6fed","#1f9d62","#e8a33d","#c0504d","#7a5ea8"] }] }
+      });
+      new Chart(document.getElementById("inventoryChart"), {
+        type: "bar",
+        data: { labels: data.inventory_levels.map(i=>i.sku),
+          datasets: [{ label:"Units in stock", data: data.inventory_levels.map(i=>i.inventory), backgroundColor: NAVY }] },
+        options: { plugins:{legend:{display:false}} }
+      });
+      const trends = data.pricing_trends.length ? data.pricing_trends
+        : [{strategy:"(no recommendations yet)", avg_price:0}];
+      new Chart(document.getElementById("trendChart"), {
+        type: "bar",
+        data: { labels: trends.map(t=>t.strategy),
+          datasets: [{ label:"Avg recommended price (₹)", data: trends.map(t=>Math.round(t.avg_price||0)), backgroundColor: GOOD }] },
+        options: { plugins:{legend:{display:false}} }
+      });
+    }
+    loadMetrics();
+  </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Django
+db.sqlite3
+*.log
+/staticfiles/
+
+# Trained ML artifacts (regenerate with: python manage.py train_models)
+/models/*.joblib
+
+# Generated dataset (regenerate with: python manage.py generate_data)
+/data/*.csv
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
